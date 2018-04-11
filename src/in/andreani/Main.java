@@ -1,5 +1,7 @@
 package in.andreani;
 
+import java.util.concurrent.Semaphore;
+
 public class Main {
 
     public static void main(String[] args) throws InterruptedException {
@@ -38,10 +40,16 @@ public class Main {
 
 class BankAccount {
     private long amount;
+    private BinarySemaphore semaphore;
 
     public BankAccount(int amount) {
         this.amount = amount;
+        this.semaphore = new BinarySemaphore();
     }
+
+    public void lockAccount() throws InterruptedException { this.semaphore.acquire(); }
+
+    public void unlockAccount() { this.semaphore.release(); }
 
     public long amount() {
         return this.amount;
@@ -63,9 +71,34 @@ class WithdrawThread extends Thread {
     public void run() {
         for (BankAccount account: this.bankAccounts) {
             // We'll try to withdraw 2 dollars. We'll check the amount first
-            if (account.amount() >= 200) {
-                account.withdraw(200);
+            try {
+                account.lockAccount();
+                if (account.amount() >= 200) {
+                    account.withdraw(200);
+                }
+                account.unlockAccount();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
+
+        }
+    }
+}
+
+class BinarySemaphore {
+    private final Semaphore countingSemaphore;
+
+    public BinarySemaphore() {
+        countingSemaphore = new Semaphore(1, true);
+    }
+
+    public void acquire() throws InterruptedException {
+        countingSemaphore.acquire();
+    }
+
+    public synchronized void release() {
+        if (countingSemaphore.availablePermits() != 1) {
+            countingSemaphore.release();
         }
     }
 }
